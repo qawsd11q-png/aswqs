@@ -1,0 +1,675 @@
+﻿<!DOCTYPE html>
+<html lang="ko" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limbus Style Clash Combat Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        cinzel: ['Cinzel', 'serif'],
+                        sans: ['Noto Sans KR', 'sans-serif'],
+                    },
+                    colors: {
+                        limbus: {
+                            red: '#e63946',
+                            blue: '#00b4d8',
+                            yellow: '#ffb703',
+                            green: '#2a9d8f',
+                            purple: '#7209b7',
+                            dark: '#080a0f',
+                            panel: '#121620',
+                            border: '#232936',
+                            accent: '#d97706'
+                        }
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
+                            '50%': { opacity: '0.9', transform: 'scale(1.05)' }
+                        },
+                        coinSpin: {
+                            '0%': { transform: 'rotateY(0deg) scale(1)' },
+                            '50%': { transform: 'rotateY(900deg) scale(1.4)' },
+                            '100%': { transform: 'rotateY(1800deg) scale(1)' }
+                        }
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s infinite ease-in-out',
+                        'coin-flip': 'coinSpin 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #080a0f; }
+        ::-webkit-scrollbar-thumb { background: #232936; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d97706; }
+
+        .limbus-card-shadow {
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.9), inset 0 0 1px rgba(255, 255, 255, 0.15);
+        }
+
+        .coin-head { background: linear-gradient(135deg, #f59e0b, #d97706); border: 2px solid #fef08a; }
+        .coin-tail { background: linear-gradient(135deg, #334155, #0f172a); border: 2px solid #64748b; }
+        .coin-indestructible { border: 2px solid #ef4444; box-shadow: 0 0 10px #ef4444; }
+
+        .attr-red { background-color: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
+        .attr-blue { background-color: #0c4a6e; border-color: #38bdf8; color: #bae6fd; }
+        .attr-yellow { background-color: #713f12; border-color: #eab308; color: #fef08a; }
+        .attr-green { background-color: #14532d; border-color: #4ade80; color: #bbf7d0; }
+        .attr-purple { background-color: #581c87; border-color: #c084fc; color: #f3e8ff; }
+
+        .def-guard { background-color: #713f12; border-color: #eab308; color: #fef08a; }
+        .def-evade { background-color: #064e3b; border-color: #34d399; color: #a7f3d0; }
+        .def-counter { background-color: #881337; border-color: #fb7185; color: #fecdd3; }
+
+        .chain-connector {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            transition: all 0.3s;
+        }
+        .chain-connector.active {
+            background: linear-gradient(90deg, #f59e0b, #ef4444);
+            box-shadow: 0 0 10px #f59e0b;
+        }
+    </style>
+</head>
+<body class="h-full font-sans select-none overflow-x-hidden flex flex-col justify-between bg-slate-950 text-slate-100">
+
+    <!-- Top Status Bar -->
+    <header class="bg-limbus-panel border-b border-limbus-border px-4 py-2.5 flex flex-wrap items-center justify-between gap-4 z-20 shadow-2xl">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-red-950 to-slate-900 border-2 border-amber-600 rounded flex items-center justify-center font-cinzel text-xl text-amber-400 font-black tracking-widest shadow-lg">
+                LC
+            </div>
+            <div>
+                <h1 class="font-cinzel text-lg md:text-xl font-black text-amber-500 tracking-wider flex items-center gap-2">
+                    LIMBUS CLASH ENGINE <span class="text-[10px] font-sans px-2 py-0.5 bg-red-950 text-red-400 border border-red-800 rounded font-bold">SUS.PNG PORTRAITS</span>
+                </h1>
+                <p class="text-[11px] text-slate-400">동일 경로 sus.png 이미지 적용 완료 (캐릭터 클릭 시 수비 전환)</p>
+            </div>
+        </div>
+
+        <!-- Resonance Indicator -->
+        <div class="flex items-center gap-3 bg-slate-900/90 px-4 py-1.5 rounded-lg border border-slate-700">
+            <span class="text-[11px] font-bold text-slate-400 tracking-wider uppercase">Resonance:</span>
+            <div id="resonanceBadge" class="px-3 py-1 rounded text-xs font-black tracking-widest bg-slate-800 text-slate-400 border border-slate-700">
+                NO RESONANCE
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex items-center gap-2">
+            <button onclick="autoSelectSkills('WIN_RATE')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 rounded text-xs font-black transition flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> 승률 우선
+            </button>
+            <button onclick="autoSelectSkills('DAMAGE')" class="px-3 py-1.5 bg-red-700 hover:bg-red-600 text-white rounded text-xs font-black transition flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-fire"></i> 피해량 우선
+            </button>
+            <button id="btnStartPhase" onclick="startClashPhase()" class="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-red-600 hover:from-amber-400 hover:to-red-500 text-slate-950 font-black rounded text-xs transition shadow flex items-center gap-1.5">
+                <i class="fa-solid fa-play"></i> 전투 개시
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Battlefield Area -->
+    <main class="flex-1 relative p-3 md:p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-7xl w-full mx-auto">
+        <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none"></div>
+
+        <!-- Left: Sinners Roster -->
+        <section class="lg:col-span-7 flex flex-col gap-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
+                <h2 class="text-xs font-bold text-slate-300 tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-users text-amber-500"></i> 수감자 명단 (sus.png 프로필 적용)
+                </h2>
+                <span class="text-[11px] text-amber-400 font-mono">💡 얼굴(sus.png) 클릭 ➡️ 수비/회피/반격 스킬 전환</span>
+            </div>
+
+            <div id="sinnersContainer" class="flex flex-col gap-2.5">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- Right: Boss Enemy Target & Combat Stage -->
+        <section class="lg:col-span-5 flex flex-col gap-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
+                <h2 class="text-xs font-bold text-red-400 tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-skull text-red-500"></i> 현재 출전 중인 보스 (Abnormality Boss)
+                </h2>
+                <span class="text-[11px] text-red-400/80 font-mono" id="enemyIndexText">STAGE 1 / 3</span>
+            </div>
+
+            <!-- Enemy Boss Card -->
+            <div class="bg-limbus-panel border border-red-900/60 rounded-lg p-3.5 flex flex-col gap-2.5 relative overflow-hidden limbus-card-shadow">
+                <div class="flex gap-3 items-center">
+                    <div id="enemyAvatar" class="w-16 h-16 rounded-lg bg-slate-900 border-2 border-red-700 flex items-center justify-center overflow-hidden shrink-0 shadow-lg">
+                        <!-- Enemy Graphic -->
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-[9px] px-2 py-0.5 bg-red-950 text-red-400 border border-red-800 rounded font-mono font-bold">ABNORMALITY BOSS</span>
+                                <h3 class="text-base font-black text-slate-100 mt-0.5" id="enemyName">환상체: 단죄하는 가시나무</h3>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[9px] text-slate-400 font-mono">체력 (HP)</span>
+                                <div class="text-base font-black text-red-500 font-mono" id="enemyHpText">200 / 200</div>
+                            </div>
+                        </div>
+
+                        <div class="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 mt-2">
+                            <div id="enemyHpBar" class="h-full bg-gradient-to-r from-red-700 to-red-500 transition-all duration-300" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/90 border border-slate-800 rounded p-2 flex justify-between items-center text-xs">
+                    <div>
+                        <span class="text-slate-400">예약 스킬: </span>
+                        <strong class="text-slate-200" id="enemySkillName">가시 덩굴 채찍</strong>
+                    </div>
+                    <div class="font-mono text-amber-400" id="enemySkillPower">기본 5 (+3 x 3코인)</div>
+                </div>
+            </div>
+
+            <!-- Clash Combat Logs & Stage -->
+            <div class="flex-1 min-h-[240px] bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col justify-between relative overflow-hidden">
+                <div class="text-[11px] font-bold text-slate-400 border-b border-slate-900 pb-1 mb-2 flex justify-between">
+                    <span>CLASH COMBAT STAGE & COIN FLIP</span>
+                    <span id="clashStageText" class="text-amber-500">대기 중...</span>
+                </div>
+
+                <div id="combatLogs" class="flex-1 overflow-y-auto space-y-1 text-xs font-mono pr-1 text-slate-300 max-h-[150px]">
+                    <div class="text-slate-500 italic">3 마리의 보스를 모두 물리치면 Stage Clear 및 최종 승리 화면이 나타납니다!</div>
+                </div>
+
+                <!-- 3D Coin Stage -->
+                <div id="coinStage" class="hidden mt-2 p-2.5 bg-slate-900/95 border border-amber-900/60 rounded-lg flex items-center justify-around z-20">
+                    <div class="text-center">
+                        <div class="text-[10px] text-slate-400 font-bold mb-1" id="stageSinnerName">수감자</div>
+                        <div class="flex gap-1.5 justify-center min-h-[32px] items-center" id="stageSinnerCoins"></div>
+                        <div class="text-base font-black text-amber-400 font-mono mt-1" id="stageSinnerPower">0</div>
+                    </div>
+                    <div class="text-xs font-black text-red-500 font-cinzel text-lg animate-pulse">VS</div>
+                    <div class="text-center">
+                        <div class="text-[10px] text-slate-400 font-bold mb-1">환상체</div>
+                        <div class="flex gap-1.5 justify-center min-h-[32px] items-center" id="stageEnemyCoins"></div>
+                        <div class="text-base font-black text-red-400 font-mono mt-1" id="stageEnemyPower">0</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Chain Dashboard -->
+    <div class="bg-slate-950 border-t-2 border-slate-800 px-4 py-3 relative">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-black text-amber-500 font-cinzel tracking-wider">SKILL CHAIN</span>
+                <span class="text-[10px] text-slate-400">현재 활성 스킬 체인 공명</span>
+            </div>
+
+            <div id="dashboardChain" class="flex-1 max-w-3xl w-full flex items-center justify-between px-4 py-2 rounded-xl bg-slate-900/90 border border-slate-700 shadow-inner overflow-x-auto">
+                <!-- Rendered dynamically -->
+            </div>
+
+            <div class="text-right">
+                <span class="text-[11px] font-mono text-slate-400">공명 상태: <strong id="resonanceDesc" class="text-amber-400">없음</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory Overlay Modal -->
+    <div id="victoryOverlay" class="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-50 hidden flex flex-col items-center justify-center p-4">
+        <div class="max-w-xl w-full bg-slate-900 border-2 border-amber-500 rounded-xl p-8 shadow-2xl text-center flex flex-col items-center gap-5 animate-pulse-glow">
+            <div class="text-6xl text-amber-400 mb-2">
+                <i class="fa-solid fa-trophy animate-bounce"></i>
+            </div>
+            <div class="px-4 py-1 bg-gradient-to-r from-red-600 via-amber-500 to-yellow-500 text-slate-950 font-black text-xs rounded tracking-widest uppercase">
+                ★ ALL BOSS STAGES CLEARED ★
+            </div>
+            <h2 class="text-3xl font-black text-slate-100 font-cinzel">전투 승리 (VICTORY)</h2>
+            <p class="text-sm text-slate-300">
+                모든 환상체 보스 몬스터들을 성공적으로 토벌하였습니다!<br>
+                수감자들의 뛰어난 연계 공격과 체인 공명으로 관리 구역을 확보했습니다.
+            </p>
+            <button onclick="restartFullGame()" class="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-slate-950 font-black rounded-lg text-sm tracking-wider transition transform active:scale-95 shadow-lg">
+                처음부터 다시 시뮬레이션
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript Game Engine Logic -->
+    <script>
+        const ATTRIBUTES = {
+            RED: { name: '분노 (Red)', hex: '#ef4444', colorClass: 'attr-red' },
+            BLUE: { name: '우울 (Blue)', hex: '#38bdf8', colorClass: 'attr-blue' },
+            YELLOW: { name: '탐식 (Yellow)', hex: '#eab308', colorClass: 'attr-yellow' },
+            GREEN: { name: '나태 (Green)', hex: '#4ade80', colorClass: 'attr-green' },
+            PURPLE: { name: '오만 (Purple)', hex: '#c084fc', colorClass: 'attr-purple' }
+        };
+
+        const MONSTERS = [
+            { 
+                name: '환상체: 단죄하는 가시나무', hp: 200, maxHp: 200, 
+                svgIcon: `<svg class="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`,
+                skill: { name: '가시 덩굴 채찍', attr: 'RED', basePower: 5, coinCount: 3, coinBonus: 3 } 
+            },
+            { 
+                name: '환상체: 방황하는 핏빛 심장', hp: 300, maxHp: 300, 
+                svgIcon: `<svg class="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>`,
+                skill: { name: '흡혈 박동', attr: 'PURPLE', basePower: 7, coinCount: 4, coinBonus: 4 } 
+            },
+            { 
+                name: '환상체: 심연의 공허한 조종자', hp: 400, maxHp: 400, 
+                svgIcon: `<svg class="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`,
+                skill: { name: '정신 파괴 파동', attr: 'BLUE', basePower: 10, coinCount: 3, coinBonus: 5 } 
+            }
+        ];
+        let currentMonsterIndex = 0;
+        let enemy = { ...MONSTERS[0] };
+
+        // 수감자 프로필 경로를 index2.html 파일이 위치한 폴더의 'sus.png' 로 지정
+        // 추가로 폴더에 들어있을 경우 대비하여 상대경로 './sus.png' 지정
+        let sinners = [
+            {
+                id: 1, name: '이상 (Yi Sang)', hp: 120, maxHp: 120, speed: 6,
+                portrait: 'sus.png',
+                defenseSkill: { name: '오감 거울 방어', type: 'SHIELD', attr: 'YELLOW', basePower: 10, coinCount: 1, coinBonus: 4, styleClass: 'def-guard' },
+                skills: {
+                    1: { name: '1스: 찰나', attr: 'RED', basePower: 4, coinCount: 1, coinBonus: 5, isIndestructible: false },
+                    2: { name: '2스: 오감도', attr: 'BLUE', basePower: 6, coinCount: 3, coinBonus: 4, isIndestructible: false },
+                    3: { name: '3스: 날개짓 (파괴불가)', attr: 'BLUE', basePower: 8, coinCount: 4, coinBonus: 3, isIndestructible: true }
+                },
+                drawnSkills: [], activeSkillIndex: 0, isDefenseActive: false, damageDealt: 0
+            },
+            {
+                id: 2, name: '파우스트 (Faust)', hp: 110, maxHp: 110, speed: 4,
+                portrait: 'sus.png',
+                defenseSkill: { name: '분석적 회피', type: 'EVADE', attr: 'GREEN', basePower: 4, coinCount: 1, coinBonus: 10, styleClass: 'def-evade' },
+                skills: {
+                    1: { name: '1스: 분석', attr: 'GREEN', basePower: 4, coinCount: 2, coinBonus: 3, isIndestructible: false },
+                    2: { name: '2스: 표상 방출기', attr: 'BLUE', basePower: 6, coinCount: 3, coinBonus: 4, isIndestructible: false },
+                    3: { name: '3스: 억측 (파괴불가)', attr: 'PURPLE', basePower: 14, coinCount: 2, coinBonus: 5, isIndestructible: true }
+                },
+                drawnSkills: [], activeSkillIndex: 0, isDefenseActive: false, damageDealt: 0
+            },
+            {
+                id: 3, name: '돈키호테 (Don Quixote)', hp: 135, maxHp: 135, speed: 7,
+                portrait: 'sus.png',
+                defenseSkill: { name: '정의의 반격', type: 'COUNTER', attr: 'RED', basePower: 8, coinCount: 1, coinBonus: 6, styleClass: 'def-counter' },
+                skills: {
+                    1: { name: '1스: 찌르기', attr: 'YELLOW', basePower: 3, coinCount: 2, coinBonus: 4, isIndestructible: false },
+                    2: { name: '2스: 산초의 창', attr: 'YELLOW', basePower: 5, coinCount: 3, coinBonus: 3, isIndestructible: false },
+                    3: { name: '3스: 돌격 (파괴불가)', attr: 'RED', basePower: 7, coinCount: 4, coinBonus: 4, isIndestructible: true }
+                },
+                drawnSkills: [], activeSkillIndex: 0, isDefenseActive: false, damageDealt: 0
+            },
+            {
+                id: 4, name: '료슈 (Ryoshu)', hp: 105, maxHp: 105, speed: 5,
+                portrait: 'sus.png',
+                defenseSkill: { name: '일격 살재 반격', type: 'COUNTER', attr: 'RED', basePower: 10, coinCount: 2, coinBonus: 4, styleClass: 'def-counter' },
+                skills: {
+                    1: { name: '1스: 긋기', attr: 'RED', basePower: 5, coinCount: 2, coinBonus: 3, isIndestructible: false },
+                    2: { name: '2스: 화룡점정', attr: 'RED', basePower: 7, coinCount: 3, coinBonus: 4, isIndestructible: false },
+                    3: { name: '3스: 절단', attr: 'GREEN', basePower: 9, coinCount: 3, coinBonus: 5, isIndestructible: false }
+                },
+                drawnSkills: [], activeSkillIndex: 0, isDefenseActive: false, damageDealt: 0
+            },
+            {
+                id: 5, name: '뫼르소 (Meursault)', hp: 150, maxHp: 150, speed: 2,
+                portrait: 'sus.png',
+                defenseSkill: { name: '단단한 절대 방어', type: 'SHIELD', attr: 'PURPLE', basePower: 14, coinCount: 1, coinBonus: 6, styleClass: 'def-guard' },
+                skills: {
+                    1: { name: '1스: 구속', attr: 'GREEN', basePower: 4, coinCount: 2, coinBonus: 3, isIndestructible: false },
+                    2: { name: '2스: 타인의 시선 (파괴불가)', attr: 'GREEN', basePower: 6, coinCount: 3, coinBonus: 3, isIndestructible: true },
+                    3: { name: '3스: 집행', attr: 'PURPLE', basePower: 11, coinCount: 3, coinBonus: 5, isIndestructible: false }
+                },
+                drawnSkills: [], activeSkillIndex: 0, isDefenseActive: false, damageDealt: 0
+            }
+        ];
+
+        window.onload = function() {
+            drawNewTurnSkills();
+            updateEnemyDisplay();
+        };
+
+        function drawNewTurnSkills() {
+            const attackPool = [1, 2, 3];
+            sinners.forEach(sinner => {
+                let shuffled = [...attackPool].sort(() => 0.5 - Math.random());
+                sinner.drawnSkills = [shuffled[0], shuffled[1]];
+                sinner.activeSkillIndex = 0;
+                sinner.isDefenseActive = false;
+            });
+            renderSinners();
+        }
+
+        function getActiveSkill(sinner) {
+            if (sinner.isDefenseActive) return sinner.defenseSkill;
+            const slotKey = sinner.drawnSkills[sinner.activeSkillIndex];
+            return sinner.skills[slotKey];
+        }
+
+        function toggleDefenseSkill(sinnerIdx) {
+            let sinner = sinners[sinnerIdx];
+            sinner.isDefenseActive = !sinner.isDefenseActive;
+            renderSinners();
+            if (sinner.isDefenseActive) {
+                logMessage(`🛡️ [수비 발동] ${sinner.name}이(가) ${sinner.defenseSkill.name} 모드로 전환되었습니다.`);
+            }
+        }
+
+        function handleImgError(imgElement, sinnerName) {
+            // 이미지가 제대로 안 눌리거나 없을 때 엑박 대신 이쁜 아바타 대체 UI로 자동 변환
+            const parentContainer = imgElement.parentElement;
+            parentContainer.innerHTML = `
+                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-red-950 to-slate-900 border-2 border-amber-600 flex items-center justify-center font-cinzel font-black text-amber-400 text-lg shadow">
+                    ${sinnerName[0]}
+                </div>
+            `;
+        }
+
+        function calculateWinRate(sinner, enemy) {
+            const sinnerSkill = getActiveSkill(sinner);
+            const enemySkill = enemy.skill;
+            
+            let sinnerMin = sinnerSkill.basePower;
+            let sinnerMax = sinnerMin + (sinnerSkill.coinCount * sinnerSkill.coinBonus);
+            let enemyMin = enemySkill.basePower;
+            let enemyMax = enemyMin + (enemySkill.coinCount * enemySkill.coinBonus);
+
+            if (sinnerSkill.type === 'EVADE') return 99;
+            if (sinnerSkill.type === 'SHIELD') return (sinnerSkill.basePower > enemyMin) ? 60 : 25;
+
+            let wins = 0;
+            let totalTrials = 0;
+            for (let sP = sinnerMin; sP <= sinnerMax; sP += (sinnerSkill.coinBonus || 1)) {
+                for (let eP = enemyMin; eP <= enemyMax; eP += (enemySkill.coinBonus || 1)) {
+                    totalTrials++;
+                    if (sP >= eP) wins++;
+                }
+            }
+            return Math.round((wins / totalTrials) * 100);
+        }
+
+        function autoSelectSkills(mode) {
+            sinners.forEach(sinner => {
+                sinner.isDefenseActive = false;
+                let bestIdx = 0;
+                let bestScore = -999;
+
+                sinner.drawnSkills.forEach((slotKey, idx) => {
+                    let sk = sinner.skills[slotKey];
+                    let maxPower = sk.basePower + (sk.coinCount * sk.coinBonus);
+                    let score = 0;
+                    if (mode === 'WIN_RATE') {
+                        let enemyMaxPower = enemy.skill.basePower + (enemy.skill.coinCount * enemy.skill.coinBonus);
+                        score = maxPower - enemyMaxPower;
+                    } else {
+                        score = maxPower + (sk.coinCount * 4);
+                    }
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestIdx = idx;
+                    }
+                });
+                sinner.activeSkillIndex = bestIdx;
+            });
+            renderSinners();
+            logMessage(`✨ [${mode === 'WIN_RATE' ? '승률 우선' : '피해량 우선'}]: 공격 스킬이 선택되었습니다.`);
+        }
+
+        function renderSinners() {
+            const container = document.getElementById('sinnersContainer');
+            container.innerHTML = '';
+
+            sinners.forEach((sinner, idx) => {
+                const activeSkill = getActiveSkill(sinner);
+                const isDefense = sinner.isDefenseActive;
+                const attrInfo = !isDefense ? ATTRIBUTES[activeSkill.attr] : null;
+                const winRate = calculateWinRate(sinner, enemy);
+
+                const row = document.createElement('div');
+                row.className = `bg-limbus-panel border ${isDefense ? 'border-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.3)]' : 'border-slate-800'} rounded-lg p-3 flex flex-wrap md:flex-nowrap items-center justify-between gap-3 transition-all ${sinner.hp <= 0 ? 'opacity-40 grayscale' : ''}`;
+                
+                let skillOptionsHtml = sinner.drawnSkills.map((slotKey, sIdx) => {
+                    const sk = sinner.skills[slotKey];
+                    const isSelected = (!isDefense && sIdx === sinner.activeSkillIndex);
+                    return `<button onclick="setSinnerActiveIndex(${idx}, ${sIdx})" class="px-2 py-1 rounded text-[10px] font-bold transition ${isSelected ? 'bg-amber-600 text-slate-950 font-black shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+                        ${slotKey}스 (${sk.coinCount}코인)
+                    </button>`;
+                }).join('');
+
+                row.innerHTML = `
+                    <div class="flex items-center gap-3 min-w-[200px] cursor-pointer group" onclick="toggleDefenseSkill(${idx})" title="클릭 시 수비/회피/반격 스킬 전환">
+                        <div class="relative">
+                            <img src="${sinner.portrait}" onerror="handleImgError(this, '${sinner.name}')" class="w-12 h-12 rounded-lg object-cover border-2 ${isDefense ? 'border-amber-400 ring-2 ring-amber-500 animate-pulse' : 'border-amber-600'} group-hover:scale-105 transition" alt="${sinner.name}">
+                            <span class="absolute -bottom-1 -right-1 px-1 py-0.2 ${isDefense ? 'bg-red-600 text-white font-black' : 'bg-slate-900 text-amber-400'} border border-slate-700 text-[8px] rounded font-mono">
+                                ${isDefense ? sinner.defenseSkill.type : 'DEF'}
+                            </span>
+                        </div>
+                        <div>
+                            <div class="font-black text-xs md:text-sm text-slate-100 flex items-center gap-1.5">
+                                ${sinner.name}
+                                <span class="text-[9px] font-mono text-slate-400">속도:${sinner.speed}</span>
+                            </div>
+                            <div class="w-28 h-2 bg-slate-900 rounded-full mt-1 overflow-hidden border border-slate-800">
+                                <div class="h-full bg-emerald-500 transition-all" style="width: ${(sinner.hp / sinner.maxHp) * 100}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
+                        ${skillOptionsHtml}
+                    </div>
+
+                    <div class="flex-1 flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded p-2 gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded text-[11px] font-bold ${isDefense ? sinner.defenseSkill.styleClass : attrInfo.colorClass}">
+                                ${isDefense ? sinner.defenseSkill.type : attrInfo.name.split(' ')[0]}
+                            </span>
+                            <div>
+                                <div class="text-xs font-bold ${isDefense ? 'text-amber-300' : 'text-slate-200'} flex items-center gap-1">
+                                    ${activeSkill.name}
+                                    ${activeSkill.isIndestructible ? '<span class="text-[8px] bg-red-900 text-red-200 px-1 rounded font-mono border border-red-500">파괴불가</span>' : ''}
+                                </div>
+                                <div class="text-[10px] font-mono text-slate-400">
+                                    기본 ${activeSkill.basePower} | 코인 ${activeSkill.coinCount}개 (${activeSkill.coinBonus >= 0 ? '+' : ''}${activeSkill.coinBonus})
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-right flex flex-col items-end gap-1 font-mono text-[10px] border-l border-slate-800 pl-3">
+                            <div class="flex gap-1.5 items-center">
+                                <span class="text-slate-400">예상 승률:</span>
+                                <span class="${winRate >= 70 ? 'text-emerald-400' : winRate >= 40 ? 'text-amber-400' : 'text-red-400'} font-bold text-xs">${winRate}%</span>
+                            </div>
+                            <div class="flex gap-1.5 items-center">
+                                <span class="text-slate-400">누적 피해량:</span>
+                                <span class="text-slate-200 font-bold text-xs">${sinner.damageDealt}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+
+            renderDashboardChain();
+        }
+
+        function setSinnerActiveIndex(sinnerIdx, slotIdx) {
+            sinners[sinnerIdx].isDefenseActive = false;
+            sinners[sinnerIdx].activeSkillIndex = slotIdx;
+            renderSinners();
+        }
+
+        function renderDashboardChain() {
+            const chain = document.getElementById('dashboardChain');
+            chain.innerHTML = '';
+
+            let attrs = sinners.map(s => getActiveSkill(s).attr);
+            let counts = {};
+            attrs.forEach(a => counts[a] = (counts[a] || 0) + 1);
+            let maxAttrCount = Math.max(...Object.values(counts));
+            
+            let badge = document.getElementById('resonanceBadge');
+            if (maxAttrCount >= 3) {
+                badge.className = "px-3 py-1 rounded text-xs font-black tracking-widest bg-amber-600 text-slate-950 border border-amber-400 animate-pulse";
+                badge.innerText = `★ ${maxAttrCount}연속 공명!`;
+                document.getElementById('resonanceDesc').innerText = `공명 (${maxAttrCount}개 속성 일치)`;
+            } else {
+                badge.className = "px-3 py-1 rounded text-xs font-black tracking-widest bg-slate-800 text-slate-400 border border-slate-700";
+                badge.innerText = "NO RESONANCE";
+                document.getElementById('resonanceDesc').innerText = "없음";
+            }
+
+            sinners.forEach((sinner, idx) => {
+                const activeSkill = getActiveSkill(sinner);
+                const attrHex = ATTRIBUTES[activeSkill.attr]?.hex || '#d97706';
+
+                const nodeWrapper = document.createElement('div');
+                nodeWrapper.className = 'flex items-center gap-2';
+
+                const node = document.createElement('div');
+                node.className = `w-8 h-8 rounded-full flex flex-col items-center justify-center font-bold text-xs border-2 shadow-lg`;
+                node.style.backgroundColor = attrHex;
+                node.style.borderColor = '#ffffff';
+                node.innerHTML = `<span class="text-[9px] text-white font-black">${sinner.name[0]}</span>`;
+
+                nodeWrapper.appendChild(node);
+                if (idx < sinners.length - 1) {
+                    const nextSkill = getActiveSkill(sinners[idx + 1]);
+                    const isMatching = activeSkill.attr === nextSkill.attr;
+                    const connector = document.createElement('div');
+                    connector.className = `w-6 md:w-10 chain-connector ${isMatching ? 'active' : ''}`;
+                    nodeWrapper.appendChild(connector);
+                }
+                chain.appendChild(nodeWrapper);
+            });
+        }
+
+        function logMessage(msg) {
+            const logs = document.getElementById('combatLogs');
+            const div = document.createElement('div');
+            div.className = "text-slate-300";
+            div.innerHTML = `> ${msg}`;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function updateEnemyDisplay() {
+            document.getElementById('enemyAvatar').innerHTML = enemy.svgIcon;
+            document.getElementById('enemyName').innerText = enemy.name;
+            document.getElementById('enemyHpText').innerText = `${enemy.hp} / ${enemy.maxHp}`;
+            document.getElementById('enemyHpBar').style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+            document.getElementById('enemySkillName').innerText = enemy.skill.name;
+            document.getElementById('enemySkillPower').innerText = `기본 ${enemy.skill.basePower} (+${enemy.skill.coinBonus} x ${enemy.skill.coinCount}코인)`;
+            document.getElementById('enemyIndexText').innerText = `STAGE ${currentMonsterIndex + 1} / ${MONSTERS.length}`;
+        }
+
+        async function startClashPhase() {
+            document.getElementById('coinStage').classList.remove('hidden');
+            document.getElementById('clashStageText').innerText = '합 진행 중...';
+
+            logMessage("⚔️ 전투 개시: 수감자들과 보스 간의 합이 시작됩니다.");
+
+            for (let i = 0; i < sinners.length; i++) {
+                let sinner = sinners[i];
+                if (sinner.hp <= 0 || enemy.hp <= 0) continue;
+
+                let sk = getActiveSkill(sinner);
+                document.getElementById('stageSinnerName').innerText = sinner.name;
+                
+                let sinnerPower = sk.basePower;
+                let enemyPower = enemy.skill.basePower;
+
+                let sinnerCoinsHtml = '';
+                let enemyCoinsHtml = '';
+
+                for (let c = 0; c < (sk.coinCount || 1); c++) {
+                    let isHead = Math.random() < 0.6;
+                    if (isHead) sinnerPower += (sk.coinBonus || 3);
+                    let borderClass = sk.isIndestructible ? 'coin-indestructible' : '';
+                    sinnerCoinsHtml += `<div class="w-6 h-6 rounded-full coin-head flex items-center justify-center text-[10px] font-black text-slate-950 animate-coin-flip shadow ${borderClass}">${isHead ? '앞' : '뒤'}</div>`;
+                }
+
+                for (let c = 0; c < enemy.skill.coinCount; c++) {
+                    let isHead = Math.random() < 0.55;
+                    if (isHead) enemyPower += enemy.skill.coinBonus;
+                    enemyCoinsHtml += `<div class="w-6 h-6 rounded-full coin-tail flex items-center justify-center text-[10px] font-black text-slate-200 animate-coin-flip shadow">${isHead ? '앞' : '뒤'}</div>`;
+                }
+
+                document.getElementById('stageSinnerCoins').innerHTML = sinnerCoinsHtml;
+                document.getElementById('stageEnemyCoins').innerHTML = enemyCoinsHtml;
+                document.getElementById('stageSinnerPower').innerText = `총합: ${sinnerPower}`;
+                document.getElementById('stageEnemyPower').innerText = `총합: ${enemyPower}`;
+
+                await new Promise(r => setTimeout(r, 800));
+
+                if (sinnerPower >= enemyPower) {
+                    let dmg = 45;
+                    enemy.hp = Math.max(0, enemy.hp - dmg);
+                    sinner.damageDealt += dmg;
+                    logMessage(`✨ [합 승리] ${sinner.name} 승리! 보스에게 ${dmg} 피해.`);
+                } else {
+                    if (sk.isIndestructible) {
+                        let dmg = 15;
+                        sinner.hp = Math.max(0, sinner.hp - dmg);
+                        logMessage(`🛡️ [합 패배-파괴불가 코인 적용] ${sinner.name} 코인 파괴 방지! 피격 피해 ${dmg}로 감소.`);
+                    } else {
+                        let dmg = 25;
+                        sinner.hp = Math.max(0, sinner.hp - dmg);
+                        logMessage(`💥 [합 패배] ${sinner.name} 패배! ${sinner.name}이(가) ${dmg} 피해.`);
+                    }
+                }
+
+                updateEnemyDisplay();
+                renderSinners();
+
+                if (enemy.hp <= 0) {
+                    logMessage(`🎉 [보스 토벌 성공!] ${enemy.name}이(가) 처치되었습니다.`);
+                    currentMonsterIndex++;
+                    if (currentMonsterIndex < MONSTERS.length) {
+                        enemy = { ...MONSTERS[currentMonsterIndex] };
+                        logMessage(`⚠️ 새로운 환상체 보스 [${enemy.name}] 등장!`);
+                        updateEnemyDisplay();
+                    } else {
+                        document.getElementById('victoryOverlay').classList.remove('hidden');
+                        document.getElementById('clashStageText').innerText = 'VICTORY!';
+                        return;
+                    }
+                }
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            document.getElementById('clashStageText').innerText = '턴 종료. 다음 턴 준비';
+            drawNewTurnSkills();
+        }
+
+        function restartFullGame() {
+            document.getElementById('victoryOverlay').classList.add('hidden');
+            currentMonsterIndex = 0;
+            enemy = { ...MONSTERS[0] };
+            sinners.forEach(s => {
+                s.hp = s.maxHp;
+                s.damageDealt = 0;
+            });
+            drawNewTurnSkills();
+            updateEnemyDisplay();
+            logMessage("🔄 게임이 리셋되었습니다. 보스 토벌을 다시 시작합니다!");
+        }
+    </script>
+</body>
+</html>
